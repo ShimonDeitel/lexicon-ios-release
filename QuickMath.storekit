@@ -18,9 +18,9 @@
   },
   "subscriptionGroups": [
     {
-      "id": "tideline_pro_group",
+      "id": "lexicon_pro_group",
       "localizations": [],
-      "name": "Tideline Pro",
+      "name": "Lexicon Pro",
       "subscriptions": [
         {
           "adHocOffers": [],
@@ -28,19 +28,19 @@
           "displayPrice": "0.99",
           "familyShareable": false,
           "groupNumber": 1,
-          "internalID": "tideline_pro_monthly_id",
+          "internalID": "lexicon_pro_monthly_id",
           "introductoryOffer": null,
           "localizations": [
             {
-              "description": "Unlimited history, dual-wave comparison & daily insights.",
-              "displayName": "Tideline Pro",
+              "description": "Archive, streak badges & daily reminders.",
+              "displayName": "Lexicon Pro",
               "locale": "en_US"
             }
           ],
-          "productID": "tideline_pro_monthly",
+          "productID": "lexicon_pro_monthly",
           "recurringSubscriptionPeriod": "P1M",
-          "referenceName": "Tideline Pro Monthly",
-          "subscriptionGroupID": "tideline_pro_group",
+          "referenceName": "Lexicon Pro Monthly",
+          "subscriptionGroupID": "lexicon_pro_group",
           "type": "RecurringSubscription"
         }
       ]

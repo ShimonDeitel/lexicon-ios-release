@@ -6,102 +6,166 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("quickmath.theme") private var themeRaw = AppTheme.system.rawValue
+    @AppStorage("lexicon.reminder.hour") private var reminderHour = 9
+    @AppStorage("lexicon.reminder.minute") private var reminderMinute = 0
+    @AppStorage("lexicon.reminder.enabled") private var reminderEnabled = false
 
     @State private var showPaywall = false
     @State private var showDeleteConfirm = false
+    @State private var reminderTime = Date()
 
-    private var theme: Binding<AppTheme> {
-        Binding(
-            get: { AppTheme(rawValue: themeRaw) ?? .system },
-            set: { themeRaw = $0.rawValue }
-        )
+    private var theme: AppTheme {
+        AppTheme(rawValue: themeRaw) ?? .system
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 QMBackground()
-
                 List {
                     // Pro section
-                    Section("Subscription") {
+                    Section("Lexicon Pro") {
                         if store.isPro {
-                            HStack {
-                                Text("Tideline Pro")
-                                Spacer()
-                                Text("Active")
-                                    .foregroundStyle(Color.qmCorrect)
-                                    .font(.subheadline.weight(.medium))
-                            }
-                            Link("Manage Subscription",
-                                 destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
+                            Label("Pro Active", systemImage: "checkmark.seal.fill")
                                 .foregroundStyle(Color.qmAccent)
-                        } else {
-                            Button("Unlock Tideline Pro") {
-                                showPaywall = true
-                            }
-                            .foregroundStyle(Color.qmAccent)
-                        }
 
-                        Button("Restore Purchase") {
-                            Task { await store.restore() }
+                            if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                Link(destination: url) {
+                                    Label("Manage Subscription", systemImage: "arrow.up.right.square")
+                                }
+                            }
+                        } else {
+                            Button {
+                                showPaywall = true
+                            } label: {
+                                Label("Unlock Lexicon Pro", systemImage: "lock.open.fill")
+                                    .foregroundStyle(Color.qmAccent)
+                            }
+
+                            Button {
+                                Task { await store.restore() }
+                            } label: {
+                                Label("Restore Purchase", systemImage: "arrow.counterclockwise")
+                            }
                         }
-                        .foregroundStyle(Color.qmAccent)
                     }
+                    .listRowBackground(Color.qmCard)
 
                     // Appearance
                     Section("Appearance") {
-                        Picker("Theme", selection: theme) {
+                        Picker("Theme", selection: $themeRaw) {
                             ForEach(AppTheme.allCases) { t in
-                                Text(t.label).tag(t)
+                                Text(t.label).tag(t.rawValue)
                             }
                         }
                         .pickerStyle(.segmented)
                     }
+                    .listRowBackground(Color.qmCard)
+
+                    // Reminders (Pro only)
+                    Section("Daily Reminder") {
+                        if store.isPro {
+                            Toggle("Enable Reminder", isOn: $reminderEnabled)
+                                .tint(Color.qmAccent)
+                                .onChange(of: reminderEnabled) { _, enabled in
+                                    if enabled {
+                                        Task {
+                                            let granted = await Reminders.requestAuthorization()
+                                            if granted {
+                                                Reminders.schedule(hour: reminderHour, minute: reminderMinute)
+                                            } else {
+                                                reminderEnabled = false
+                                            }
+                                        }
+                                    } else {
+                                        Reminders.cancel()
+                                    }
+                                }
+
+                            if reminderEnabled {
+                                DatePicker(
+                                    "Time",
+                                    selection: $reminderTime,
+                                    displayedComponents: .hourAndMinute
+                                )
+                                .onChange(of: reminderTime) { _, time in
+                                    let components = Calendar.current.dateComponents([.hour, .minute], from: time)
+                                    reminderHour = components.hour ?? 9
+                                    reminderMinute = components.minute ?? 0
+                                    Reminders.schedule(hour: reminderHour, minute: reminderMinute)
+                                }
+                            }
+                        } else {
+                            Button {
+                                showPaywall = true
+                            } label: {
+                                Label("Pro feature — unlock to set reminders", systemImage: "lock.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listRowBackground(Color.qmCard)
 
                     // Legal
-                    Section("Legal") {
-                        Link("Privacy Policy",
-                             destination: URL(string: "https://shimondeitel.github.io/tideline-site/privacy.html")!)
-                            .foregroundStyle(Color.qmAccent)
-                        Link("Terms of Use",
-                             destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-                            .foregroundStyle(Color.qmAccent)
-                    }
-
-                    // Data
-                    Section("Data") {
-                        Button("Delete All Data") {
-                            showDeleteConfirm = true
+                    Section("About") {
+                        if let privacyURL = URL(string: "https://shimondeitel.github.io/lexicon-site/privacy.html") {
+                            Link(destination: privacyURL) {
+                                Label("Privacy Policy", systemImage: "hand.raised")
+                            }
                         }
-                        .foregroundStyle(Color.qmWrong)
+                        if let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/") {
+                            Link(destination: termsURL) {
+                                Label("Terms of Use", systemImage: "doc.text")
+                            }
+                        }
                     }
+                    .listRowBackground(Color.qmCard)
+
+                    // Danger zone
+                    Section {
+                        Button(role: .destructive) {
+                            showDeleteConfirm = true
+                        } label: {
+                            Label("Delete All Data", systemImage: "trash")
+                        }
+                    }
+                    .listRowBackground(Color.qmCard)
                 }
+                .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .confirmationDialog(
+                "Delete all data?",
+                isPresented: $showDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Everything", role: .destructive) {
+                    appModel.deleteAllData()
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will remove all your words, streak, and favorites. This cannot be undone.")
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
                     .environmentObject(store)
             }
-            .confirmationDialog(
-                "Delete all Tideline data?",
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Delete All", role: .destructive) {
-                    appModel.deleteAllData()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes all your logged energy entries and cannot be undone.")
-            }
+        }
+        .onAppear {
+            var comps = DateComponents()
+            comps.hour = reminderHour
+            comps.minute = reminderMinute
+            reminderTime = Calendar.current.date(from: comps) ?? Date()
         }
     }
 }
